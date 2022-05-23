@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:jira="http://www.mulesoft.org/schema/mule/jira"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jira http://www.mulesoft.org/schema/mule/jira/current/mule-jira.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="08d7189c-9395-49a1-8111-475bbdd81823" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="04d5e5a5-62a9-47ac-8ddf-df5089179b82" >
+		<http:request-connection host="localhost" port="8087" >
+			<http:authentication >
+				<http:basic-authentication username="skompella" password="password" />
+			</http:authentication>
+		</http:request-connection>
+	</http:request-config>
+	<flow name="mule-jira-pocFlow" doc:id="d24549d4-6084-46ee-be7b-6f84be0248bc" >
+		<http:listener doc:name="createIssue" doc:id="5ad7ae3d-31c4-46b9-be56-4274105503a6" config-ref="HTTP_Listener_config" path="/createIssue"/>
+		<http:request method="POST" doc:name="create session" doc:id="d4622121-690e-4c78-bf30-937854ec06f7" config-ref="HTTP_Request_configuration" path="/rest/auth/1/session">
+			<http:body ><![CDATA[#[output application/json
+---
+{"username": "skompella", "password": "password" }]]]></http:body>
+		</http:request>
+		<ee:transform doc:name="jSessionId" doc:id="b7ab7cf9-8e17-48b7-a95b-92be9f9c84b4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var session_id = payload.session.value
+---
+session_id
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Log jSessionId" doc:id="edd3f782-f3da-4e0e-a786-3c366759d976" message="#[payload]"/>
+		<http:request method="POST" doc:name="create issue" doc:id="1896ac4e-a38a-4f41-a089-b8117827f18a" config-ref="HTTP_Request_configuration" path="/rest/api/2/issue" outputMimeType="application/json">
+			<http:body ><![CDATA[#[output application/json
+---
+{
+    "fields": {
+        "project": {
+            "key": "MSJIR"
+        },
+        "summary": "Splunk issue 2 created",
+        "issuetype": {
+            "name": "Bug"
+        }
+    }
+}]]]></http:body>
+			<http:headers ><![CDATA[#[%dw 2.0
+output application/json
+---
+{
+	"Cookie" : "JSESSIONID=" ++ payload as String
+}]]]></http:headers>
+		</http:request>
+	</flow>
+</mule>
